@@ -34,7 +34,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - bedrock-runtime:InvokeModel
+                  - bedrock:InvokeModel
                 Resource: 
                   - 'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-canvas-v1:0'
 
