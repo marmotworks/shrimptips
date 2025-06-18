@@ -1,0 +1,257 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ShrimpTips - Serverless webapp for generating OSHA-style safety posters for wild shrimp using AWS Bedrock Nova Canvas'
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: 'shrimp.tips'
+    Description: 'Domain name for the application'
+  
+  HostedZoneId:
+    Type: String
+    Description: 'Route 53 Hosted Zone ID for the domain'
+    Default: ''
+
+Resources:
+  # IAM Role for Lambda functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-lambda-execution-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock-runtime:InvokeModel
+                Resource: 
+                  - 'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-canvas-v1:0'
+
+  # Lambda function for poster generation
+  PosterGeneratorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-poster-generator'
+      Runtime: python3.12
+      Handler: poster_generator.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Code:
+        ZipFile: |
+          # Placeholder - will be replaced with actual code during deployment
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder function'}
+
+  # Lambda function for web interface
+  WebInterfaceFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-web-interface'
+      Runtime: python3.12
+      Handler: web_interface.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          # Placeholder - will be replaced with actual code during deployment
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder function'}
+
+  # API Gateway REST API
+  ShrimpTipsApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${AWS::StackName}-api'
+      Description: 'API for ShrimpTips webapp'
+      EndpointConfiguration:
+        Types:
+          - EDGE
+
+  # API Gateway Resource for poster endpoint
+  PosterResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ShrimpTipsApi
+      ParentId: !GetAtt ShrimpTipsApi.RootResourceId
+      PathPart: 'api'
+
+  PosterSubResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ShrimpTipsApi
+      ParentId: !Ref PosterResource
+      PathPart: 'poster'
+
+  # GET method for poster generation
+  PosterGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ShrimpTipsApi
+      ResourceId: !Ref PosterSubResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PosterGeneratorFunction.Arn}/invocations'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+
+  # OPTIONS method for CORS
+  PosterOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ShrimpTipsApi
+      ResourceId: !Ref PosterSubResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # GET method for root path (web interface)
+  RootGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ShrimpTipsApi
+      ResourceId: !GetAtt ShrimpTipsApi.RootResourceId
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebInterfaceFunction.Arn}/invocations'
+
+  # Lambda permissions for API Gateway
+  PosterLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PosterGeneratorFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ShrimpTipsApi}/*/GET/api/poster'
+
+  WebInterfaceLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WebInterfaceFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ShrimpTipsApi}/*/GET/'
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - PosterGetMethod
+      - PosterOptionsMethod
+      - RootGetMethod
+    Properties:
+      RestApiId: !Ref ShrimpTipsApi
+      StageName: 'prod'
+
+  # Custom domain name (conditional)
+  CustomDomainName:
+    Type: AWS::ApiGateway::DomainName
+    Condition: HasHostedZone
+    Properties:
+      DomainName: !Ref DomainName
+      CertificateArn: !Ref SSLCertificate
+      EndpointConfiguration:
+        Types:
+          - EDGE
+
+  # SSL Certificate for custom domain
+  SSLCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: HasHostedZone
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+
+  # Base path mapping
+  BasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Condition: HasHostedZone
+    DependsOn: ApiDeployment
+    Properties:
+      DomainName: !Ref CustomDomainName
+      RestApiId: !Ref ShrimpTipsApi
+      Stage: 'prod'
+
+  # Route 53 record
+  DNSRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasHostedZone
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CustomDomainName.DistributionDomainName
+        HostedZoneId: !GetAtt CustomDomainName.DistributionHostedZoneId
+
+Conditions:
+  HasHostedZone: !Not [!Equals [!Ref HostedZoneId, '']]
+
+Outputs:
+  ApiGatewayUrl:
+    Description: 'URL of the API Gateway'
+    Value: !Sub 'https://${ShrimpTipsApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
+    Export:
+      Name: !Sub '${AWS::StackName}-api-url'
+
+  CustomDomainUrl:
+    Condition: HasHostedZone
+    Description: 'Custom domain URL'
+    Value: !Sub 'https://${DomainName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-custom-url'
+
+  PosterGeneratorFunctionArn:
+    Description: 'ARN of the poster generator Lambda function'
+    Value: !GetAtt PosterGeneratorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-poster-function-arn'
+
+  WebInterfaceFunctionArn:
+    Description: 'ARN of the web interface Lambda function'
+    Value: !GetAtt WebInterfaceFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-web-function-arn'
