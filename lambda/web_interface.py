@@ -131,7 +131,7 @@ def lambda_handler(event, context):
     <div class="header">
         <h1>🦐 ShrimpTips</h1>
         <p>Ocean Safety & Health Guidance for Wild Shrimp</p>
-        <p><em>Professional safety posters by the Ocean Floor Safety Inspectors Union</em></p>
+        <p><em>Professional Safety Posters by the Ocean Floor Safety Inspectors Union</em></p>
     </div>
     
     <div class="poster-container">
