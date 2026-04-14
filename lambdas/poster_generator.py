@@ -2,10 +2,16 @@
 Lambda function to generate OSHA-style safety posters for wild shrimp using AWS Bedrock Nova Canvas.
 """
 import json
-import base64
 import boto3
 import random
+import re
+import logging
+import traceback
 from botocore.config import Config
+
+# Initialize logger
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 # Initialize Bedrock client
 bedrock = boto3.client(
@@ -52,11 +58,7 @@ SHRIMP_SCENARIOS = [
     "shrimp hiding in seaweed"
 ]
 
-def generate_creative_prompt_with_ai():
-    """Use Bedrock Nova Pro to generate a creative and varied poster prompt."""
-    
-    # Create a prompt for the AI to generate a poster description
-    ai_prompt = """You are a creative director for the Ocean Floor Safety Inspectors Union, tasked with creating OSHA-style safety posters for wild shrimp. 
+AI_PROMPT = """You are a creative director for the Ocean Floor Safety Inspectors Union, tasked with creating OSHA-style safety posters for wild shrimp. 
 
 Generate a unique and creative safety poster concept that includes:
 1. A specific safety tip or warning for wild shrimp (be creative but realistic to ocean dangers)
@@ -74,13 +76,16 @@ Be creative and vary the scenarios - think about different ocean zones (coral re
 
 Format your response as a single detailed image generation prompt, and end with the safety slogan in quotes."""
 
+def generate_creative_prompt_with_ai():
+    """Use Bedrock Nova Pro to generate a creative and varied poster prompt."""
+    
     try:
         # Call Nova Pro to generate the creative prompt
         request_body = json.dumps({
             "messages": [
                 {
                     "role": "user",
-                    "content": [{"text": ai_prompt}]
+                    "content": [{"text": AI_PROMPT}]
                 }
             ],
             "inferenceConfig": {
@@ -108,7 +113,6 @@ Format your response as a single detailed image generation prompt, and end with 
         for line in reversed(lines):
             if '"' in line:
                 # Extract text between quotes
-                import re
                 quotes = re.findall(r'"([^"]*)"', line)
                 if quotes:
                     safety_tip = quotes[-1]
@@ -118,8 +122,6 @@ Format your response as a single detailed image generation prompt, and end with 
         
     except Exception as e:
         # Fallback to original method if AI generation fails
-        import logging
-        logger = logging.getLogger()
         logger.warning(f"AI prompt generation failed, falling back to original method: {str(e)}")
         return generate_fallback_prompt()
 
@@ -157,9 +159,6 @@ def lambda_handler(event, context):
     Main Lambda handler function.
     """
     try:
-        import logging
-        logger = logging.getLogger()
-        logger.setLevel(logging.INFO)
         logger.info("Starting poster generation")
         
         # Generate the poster prompt using AI
@@ -221,7 +220,6 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error(f"Error generating poster: {str(e)}")
         logger.error(f"Error type: {type(e).__name__}")
-        import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         
         return {

@@ -3,12 +3,12 @@
 Deployment script for ShrimpTips CloudFormation stack.
 This script packages the Lambda functions and deploys the CloudFormation template.
 """
-import os
 import sys
-import json
+import os
 import boto3
 import zipfile
 import tempfile
+from pathlib import Path
 from botocore.exceptions import ClientError
 
 def create_lambda_package(function_name, source_file):
@@ -19,7 +19,7 @@ def create_lambda_package(function_name, source_file):
     with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_zip:
         with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
             # Add the Python file to the zip
-            zipf.write(source_file, os.path.basename(source_file))
+            zipf.write(source_file, Path(source_file).name)
         
         return temp_zip.name
 
@@ -117,7 +117,7 @@ def main():
         sts = boto3.client('sts')
         identity = sts.get_caller_identity()
         print(f"Deploying with AWS Account: {identity['Account']}")
-        print(f"Using region: us-east-1")
+        print("Using region: us-east-1")
     except Exception as e:
         print(f"Error with AWS credentials: {e}")
         sys.exit(1)
@@ -126,14 +126,14 @@ def main():
     
     # Deploy CloudFormation stack first
     print("\n1. Deploying CloudFormation stack...")
-    template_file = "templates/shrimptips-stack.yaml"
+    template_file = Path("templates/shrimptips-stack.yaml")
     
-    if not os.path.exists(template_file):
+    if not template_file.exists():
         print(f"Error: Template file {template_file} not found!")
         sys.exit(1)
     
     # For now, deploy without custom domain (hosted zone ID can be added later)
-    success = deploy_cloudformation_stack(stack_name, template_file)
+    success = deploy_cloudformation_stack(stack_name, str(template_file))
     
     if not success:
         print("CloudFormation deployment failed!")
@@ -143,12 +143,12 @@ def main():
     print("\n2. Updating Lambda functions with code...")
     
     # Package and update poster generator function
-    poster_zip = create_lambda_package("poster_generator", "lambda/poster_generator.py")
+    poster_zip = create_lambda_package("poster_generator", "lambdas/poster_generator.py")
     success1 = update_lambda_function(f"{stack_name}-poster-generator", poster_zip)
     os.unlink(poster_zip)  # Clean up temp file
     
     # Package and update web interface function
-    web_zip = create_lambda_package("web_interface", "lambda/web_interface.py")
+    web_zip = create_lambda_package("web_interface", "lambdas/web_interface.py")
     success2 = update_lambda_function(f"{stack_name}-web-interface", web_zip)
     os.unlink(web_zip)  # Clean up temp file
     
