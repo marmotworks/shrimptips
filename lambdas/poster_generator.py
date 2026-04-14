@@ -13,6 +13,16 @@ from botocore.config import Config
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+# Configuration for AI model parameters
+CONFIG = {
+    "NOVA_PRO_MAX_TOKENS": 1000,
+    "NOVA_PRO_TEMPERATURE": 0.8,
+    "NOVA_PRO_TOP_P": 0.9,
+    "NOVA_CANVAS_MAX_PROMPT_LENGTH": 1024,
+    "NOVA_CANVAS_CFG_SCALE": 7.0,
+    "NOVA_CANVAS_QUALITY": "premium"
+}
+
 # Initialize Bedrock client
 bedrock = boto3.client(
     service_name='bedrock-runtime',
@@ -66,11 +76,12 @@ Generate a unique and creative safety poster concept that includes:
 3. Specific visual style elements that would work for a vintage OSHA poster
 
 Your response should be a detailed image generation prompt that includes:
-- The safety message/slogan (make it catchy and memorable)
+- The safety message/slogan (make it short, catchy, and memorable)
+- Instructions for the text: The slogan MUST be written in bold, clean, legible sans-serif typography, centered and prominently displayed. The text should be high-contrast and coherent.
 - The visual scene (specific ocean environment, shrimp behavior, potential hazards)
-- Visual style (vintage OSHA poster aesthetic with maritime elements)
-- Color scheme and typography suggestions
-- Safety symbols and iconography to include
+- Visual style (vintage OSHA poster aesthetic with maritime elements, distressed paper texture, high quality)
+- Color scheme (traditional safety colors: hazard yellow, signal red, deep black)
+- Safety symbols and iconography (e.g., warning triangles, exclamation marks)
 
 Be creative and vary the scenarios - think about different ocean zones (coral reefs, deep sea, kelp forests, open ocean), different types of hazards (predators, pollution, fishing equipment, currents, temperature changes), and different shrimp behaviors (schooling, feeding, hiding, migrating).
 
@@ -89,9 +100,9 @@ def generate_creative_prompt_with_ai():
                 }
             ],
             "inferenceConfig": {
-                "maxTokens": 500,
-                "temperature": 0.8,
-                "topP": 0.9
+                "maxTokens": CONFIG["NOVA_PRO_MAX_TOKENS"],
+                "temperature": CONFIG["NOVA_PRO_TEMPERATURE"],
+                "topP": CONFIG["NOVA_PRO_TOP_P"]
             }
         })
         
@@ -167,19 +178,22 @@ def lambda_handler(event, context):
         logger.info(f"Full prompt: {prompt[:200]}...")  # Log first 200 chars for debugging
         
         # Prepare the request body for Nova Canvas
+        # Truncate prompt to the maximum allowed length defined in CONFIG
+        truncated_prompt = prompt[:CONFIG["NOVA_CANVAS_MAX_PROMPT_LENGTH"] - 1]
+        
         api_request = json.dumps({
             "taskType": "TEXT_IMAGE",
             "textToImageParams": {
-                "text": prompt,
-                "negativeText": "blurry, low quality, distorted text, unreadable, modern digital style"
+                "text": truncated_prompt,
+                "negativeText": "blurry, low quality, distorted text, unreadable, modern digital style, misspelled words"
             },
             "imageGenerationConfig": {
                 "numberOfImages": 1,
                 "height": 1024,
                 "width": 768,  # Portrait orientation for poster
                 "seed": random.randint(1, 1000000),
-                "cfgScale": 7.0,
-                "quality": "premium"
+                "cfgScale": CONFIG["NOVA_CANVAS_CFG_SCALE"],
+                "quality": CONFIG["NOVA_CANVAS_QUALITY"]
             }
         })
         

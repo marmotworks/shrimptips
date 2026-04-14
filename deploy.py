@@ -101,8 +101,10 @@ def deploy_cloudformation_stack(stack_name, template_file, hosted_zone_id=None):
             print(f"  {output['OutputKey']}: {output['OutputValue']}")
         
         return True
-        
     except ClientError as e:
+        if 'No updates are to be performed' in str(e):
+            print("No updates needed for CloudFormation stack.")
+            return True
         print(f"Error with CloudFormation stack: {e}")
         return False
 
