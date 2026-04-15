@@ -25,7 +25,6 @@ def lambda_handler(event, context):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ShrimpTips - Ocean Safety for Wild Shrimp</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦐</text></svg>">
     <style>
         body {
             margin: 0;
@@ -173,7 +172,8 @@ def lambda_handler(event, context):
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
                 }
                 
                 const data = await response.json();

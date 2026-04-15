@@ -200,18 +200,30 @@ def lambda_handler(event, context):
         logger.info("Calling Bedrock Nova Canvas")
         
         # Call Nova Canvas to generate the image
-        response = bedrock.invoke_model(
-            body=api_request,
-            modelId='amazon.nova-canvas-v1:0',
-            accept='application/json',
-            contentType='application/json'
-        )
+        for attempt in range(3):
+            try:
+                response = bedrock.invoke_model(
+                    body=api_request,
+                    modelId='amazon.nova-canvas-v1:0',
+                    accept='application/json',
+                    contentType='application/json'
+                )
+                break
+            except Exception as e:
+                if attempt == 2:
+                    raise e
+                logger.warning(f"Attempt {attempt + 1} failed to generate image: {str(e)}. Retrying...")
         
         logger.info("Received response from Bedrock")
         
         # Parse the response
         response_json = json.loads(response.get("body").read())
-        base64_image = response_json.get("images")[0]
+        images = response_json.get("images")
+        
+        if not images or len(images) == 0:
+            raise ValueError("Bedrock returned no images in the response")
+            
+        base64_image = images[0]
         
         logger.info("Successfully generated poster image")
         

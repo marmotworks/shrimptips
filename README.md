@@ -1,94 +1,91 @@
 # 🦐 ShrimpTips
 
-The ShrimpTips repository powers an efficient serverless web application that delivers health and safety guidance tailored exclusively for wild shrimp navigating the perils of the open ocean. Leveraging AWS-native technologies, this app generates wellness tips rooted in marine ecology, environmental science, and a touch of nautical whimsy. Each guideline is transformed into a striking, retro-style Occupational Safety & Health Administration (OSHA)-inspired poster—as if designed by a union of ocean-floor safety inspectors. With taglines like "Beware the Bottom Trawlers!" and "Current Awareness is Self-Awareness," the posters offer survival wisdom for the free-roaming shrimp of the seas. Whether dodging predators, avoiding pollution zones, or just trying to stay upright in a strong current, ShrimpTips is a spirited salute to shellfish safety in the wild, presented with style, satire, and serious crustacean care.
+ShrimpTips is a serverless web application that delivers hilarious and visually striking health and safety guidance tailored exclusively for wild shrimp navigating the perils of the open ocean. 
+
+Leveraging advanced AI, the app generates unique, retro-style Occupational Safety & Health Administration (OSHA)-inspired posters. Each poster features a creative safety tip and a high-quality visual scenario, as if designed by a union of ocean-floor safety inspectors. With taglines like "Beware the Bottom Trawlers!" and "Current Awareness is Self-Awareness," ShrimpTips offers survival wisdom for the free-roaming shrimp of the seas with style, satire, and serious crustacean care.
 
 ## 🏗️ Architecture
 
-This serverless application uses:
-- **AWS Lambda** - Serverless compute for poster generation and web interface
-- **AWS Bedrock Nova Canvas** - AI image generation for OSHA-style safety posters
-- **API Gateway** - RESTful API and web hosting
-- **CloudFormation** - Infrastructure as Code (IaC)
-- **Route 53** - DNS management for custom domain (optional)
-- **Certificate Manager** - SSL/TLS certificates (optional)
+ShrimpTips uses a sophisticated multi-stage AI pipeline built on AWS serverless technologies:
+
+1.  **Web Interface**: A responsive HTML/JavaScript frontend served via **Amazon API Gateway** and **AWS Lambda**.
+2.  **AI Prompt Engineering**: When a user requests a poster, the **Poster Generator Lambda** calls **Amazon Bedrock (Amazon Nova Pro)** to generate a highly creative and contextually rich image generation prompt.
+3.  **AI Image Generation**: The generated prompt is then passed to **Amazon Bedrock (Amazon Nova Canvas)** to produce a unique, high-quality, OSHA-style safety poster.
+4.  **Infrastructure as Code (IaC)**: The entire environment is provisioned and managed using **AWS CloudFormation**.
+5.  **Custom Domain & Security**: Optional support for custom domains using **Amazon Route 53** and **AWS Certificate Manager (ACM)**.
 
 ## 🚀 Quick Deployment
 
 ### Prerequisites
 
-1. AWS CLI configured with appropriate credentials
-2. Python 3.12+ installed
-3. Access to AWS Bedrock Nova Canvas model in us-east-1 region
+1.  **AWS CLI** configured with appropriate credentials and access to the `us-east-1` region.
+2.  **Python 3.12+** installed.
+3.  **AWS Bedrock Model Access**: Ensure you have access to the following models in `us-east-1`:
+    - `amazon.nova-pro-v1:0` (for prompt generation)
+    - `amazon.nova-canvas-v1:0` (for image generation)
+4.  **Boto3** installed (`pip install boto3`).
 
 ### Deploy the Application
 
-1. **Clone and navigate to the repository:**
-   ```bash
-   git clone <repository-url>
-   cd shrimptips
-   ```
+1.  **Clone and navigate to the repository:**
+    ```bash
+    git clone <repository-url>
+    cd shrimptips
+    ```
 
-2. **Set up AWS credentials:**
-   ```bash
-   export AWS_ACCESS_KEY_ID=your_access_key
-   export AWS_SECRET_ACCESS_KEY=your_secret_key
-   export AWS_DEFAULT_REGION=us-east-1
-   ```
+2.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-3. **Deploy the stack:**
-   ```bash
-   python deploy.py
-   ```
+3.  **Deploy the stack:**
+    ```bash
+    python deploy.py
+    ```
 
-4. **Access your application:**
-   The deployment script will output the API Gateway URL where your application is accessible.
+4.  **Access your application:**
+    The deployment script will output the **API Gateway URL**. Open this URL in your browser to see your ShrimpTips application in action!
 
 ### Custom Domain Setup (Optional)
 
 To use the `shrimp.tips` domain:
 
-1. Ensure you have a Route 53 hosted zone for `shrimp.tips`
-2. Update the deployment script or CloudFormation parameters with your hosted zone ID
-3. Redeploy the stack
+1.  Ensure you have a Route 53 hosted zone for `shrimp.tips`.
+2.  Modify `deploy.py` to pass the `HostedZoneId` to the `deploy_cloudformation_stack` function.
+3.  Redeploy the stack.
 
 ## 📁 Project Structure
 
 ```
 shrimptips/
-├── lambda/
-│   ├── poster_generator.py    # Nova Canvas image generation
-│   └── web_interface.py       # HTML web interface
+├── lambdas/
+│   ├── poster_generator.py    # Nova Pro + Nova Canvas image generation
+│   └── web_interface.py       # HTML web interface & API routing
 ├── templates/
 │   └── shrimptips-stack.yaml  # CloudFormation template
 ├── deploy.py                  # Deployment automation script
+├── check_deployment.py        # Utility to verify Lambda sync
 ├── requirements.txt           # Python dependencies
 └── README.md                  # This file
 ```
 
 ## 🎨 Features
 
-- **AI-Generated Safety Posters**: Uses AWS Bedrock Nova Canvas to create unique OSHA-style safety posters
-- **Randomized Content**: Each visit generates a new poster with different safety tips and visual styles
-- **Responsive Design**: Works on desktop and mobile devices
-- **Serverless Architecture**: Scales automatically and costs only for usage
-- **Custom Domain Support**: Can be configured to work with shrimp.tips domain
+- **Multi-Stage AI Generation**: Uses a combination of Nova Pro and Nova Canvas for unparalleled creativity.
+- **Retro OSHA Aesthetic**: High-quality, vintage-style safety posters.
+- **Randomized Content**: Every visit generates a new, unique safety tip and visual.
+- **Serverless & Scalable**: Scales automatically with demand and costs only when used.
+- **Responsive Design**: Works seamlessly on desktop and mobile devices.
 
 ## 🔧 Configuration
 
-### Environment Variables
+### AWS Requirements
 
-The Lambda functions use the following AWS services:
-- **Bedrock Runtime**: For Nova Canvas image generation
-- **CloudWatch Logs**: For application logging
-
-### Safety Tips Database
-
-The application includes 15+ predefined safety tips for wild shrimp:
-- "Beware the Bottom Trawlers!"
-- "Current Awareness is Self-Awareness"
-- "Stay Alert in Kelp Forests"
-- "Predator Detection Saves Lives"
-- And many more...
+The application requires access to the following AWS services:
+- **Amazon Bedrock**: For Nova Pro and Nova Canvas model invocation.
+- **AWS Lambda**: To run the web interface and poster generation logic.
+- **Amazon API Gateway**: To host the RESTful API and web interface.
+- **AWS CloudWatch**: For application logging and monitoring.
 
 ## 🛠️ Development
 
@@ -96,63 +93,57 @@ The application includes 15+ predefined safety tips for wild shrimp:
 
 To test the Lambda functions locally:
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+1.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-2. Set up AWS credentials for Bedrock access
+2.  Set up AWS credentials with access to Bedrock in `us-east-1`.
 
-3. Run individual functions with test events
+3.  Run individual functions with test events using a local testing tool or `pytest`.
 
-### Updating the Application
+### Verifying Deployment
 
-To update the application after making changes:
+After deploying, you can verify that your local code is synchronized with the deployed Lambda functions using the utility script:
 
-1. Modify the Lambda function code in the `lambda/` directory
-2. Run the deployment script again:
-   ```bash
-   python deploy.py
-   ```
+```bash
+python check_deployment.py
+```
 
 ## 📊 Monitoring
 
-The application includes CloudWatch logging for:
-- Image generation requests and responses
-- Error tracking and debugging
-- Performance monitoring
+The application uses **Amazon CloudWatch** for:
+- Logging Bedrock request/response cycles.
+- Error tracking and debugging.
+- Performance monitoring of Lambda execution.
 
 ## 🔒 Security
 
-- IAM roles with minimal required permissions
-- CORS enabled for web browser access
-- HTTPS-only access through API Gateway
-- No sensitive data stored or logged
+- **IAM Least Privilege**: Lambda execution roles are scoped to minimum required permissions.
+- **HTTPS-only**: All traffic is served over HTTPS via API Gateway.
+- **CORS**: Properly configured for secure browser access.
 
 ## 💰 Cost Optimization
 
-This serverless architecture is designed for cost efficiency:
-- Pay-per-request pricing for Lambda and API Gateway
-- Bedrock Nova Canvas charges per image generated
-- No always-on infrastructure costs
-- Automatic scaling based on demand
+This architecture is designed for maximum cost-efficiency:
+- **Pay-per-use**: Lambda, API Gateway, and Bedrock are all consumption-based.
+- **Zero Idle Cost**: No running servers or always-on infrastructure.
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+1. Fork the repository.
+2. Create a feature branch.
+3. Make your changes.
+4. Test thoroughly (using `pytest` and `check_deployment.py`).
+5. Submit a pull request.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## 🆘 Support
 
 For issues or questions:
-1. Check the CloudWatch logs for error details
-2. Verify AWS Bedrock model access in us-east-1
-3. Ensure proper IAM permissions for Lambda execution role
-4. Review the CloudFormation stack events for deployment issues
+1. Check the CloudWatch logs for error details.
+2. Verify AWS Bedrock model access in `us-east-1`.
+3. Ensure proper IAM permissions for the Lambda execution role.
