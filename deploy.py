@@ -12,6 +12,8 @@ import tempfile
 from pathlib import Path
 from botocore.exceptions import ClientError
 
+import config
+
 def create_lambda_package(function_name, source_file):
     """Create a deployment package for a Lambda function."""
     print(f"Creating deployment package for {function_name}...")
@@ -26,7 +28,7 @@ def create_lambda_package(function_name, source_file):
 
 def update_lambda_function(function_name, zip_file_path):
     """Update a Lambda function with new code."""
-    lambda_client = boto3.client('lambda', region_name='us-east-1')
+    lambda_client = boto3.client('lambda', region_name=config.AWS_REGION)
     
     try:
         with open(zip_file_path, 'rb') as zip_file:
@@ -41,16 +43,16 @@ def update_lambda_function(function_name, zip_file_path):
         return False
 
 def delete_legacy_cloudfront_distribution():
-    """Delete the legacy CloudFront distribution E1XNJL0XEWSTK.
+    """Delete the legacy CloudFront distribution.
     
     Before deleting, removes the shrimp.tips CNAME alias to free it for
     the new CloudFormation-managed distribution.
     """
     print("\n1. Cleaning up legacy CloudFront distribution...")
-    cloudfront = boto3.client('cloudfront', region_name='us-east-1')
+    cloudfront = boto3.client('cloudfront', region_name=config.AWS_REGION)
     
     try:
-        dist = cloudfront.get_distribution(Id='E1XNJL0XEWSTK')
+        dist = cloudfront.get_distribution(Id=config.LEGACY_CLOUDFRONT_DISTRIBUTION_ID)
         dist_config = dist['Distribution']['DistributionConfig']
         etag = dist['ETag']
         
@@ -68,7 +70,7 @@ def delete_legacy_cloudfront_distribution():
         
         # Update the distribution to remove the alias
         cloudfront.update_distribution(
-            Id='E1XNJL0XEWSTK',
+            Id=config.LEGACY_CLOUDFRONT_DISTRIBUTION_ID,
             DistributionConfig=dist_config,
             IfMatch=etag
         )
@@ -78,17 +80,17 @@ def delete_legacy_cloudfront_distribution():
         time.sleep(5)
         
         # Re-fetch the ETag since update_distribution generates a new one
-        dist = cloudfront.get_distribution(Id='E1XNJL0XEWSTK')
+        dist = cloudfront.get_distribution(Id=config.LEGACY_CLOUDFRONT_DISTRIBUTION_ID)
         etag = dist['ETag']
         
         # Delete the distribution
-        cloudfront.delete_distribution(Id='E1XNJL0XEWSTK', IfMatch=etag)
-        print("  Deleted legacy CloudFront distribution E1XNJL0XEWSTK")
+        cloudfront.delete_distribution(Id=config.LEGACY_CLOUDFRONT_DISTRIBUTION_ID, IfMatch=etag)
+        print(f"  Deleted legacy CloudFront distribution {config.LEGACY_CLOUDFRONT_DISTRIBUTION_ID}")
         
         # Wait for deletion to complete (max ~5 minutes)
         print("  Waiting for distribution deletion to complete...")
         waiter = cloudfront.get_waiter('distribution_deleted')
-        waiter.wait(Id='E1XNJL0XEWSTK', WaiterConfig={'Delay': 10, 'MaxAttempts': 30})
+        waiter.wait(Id=config.LEGACY_CLOUDFRONT_DISTRIBUTION_ID, WaiterConfig={'Delay': 10, 'MaxAttempts': 30})
         print("  Legacy CloudFront distribution deleted successfully")
         
     except ClientError as e:
@@ -99,13 +101,13 @@ def delete_legacy_cloudfront_distribution():
             print(f"  Precondition error (etag mismatch): {e}")
             print("  Attempting to re-fetch and delete...")
             try:
-                dist = cloudfront.get_distribution(Id='E1XNJL0XEWSTK')
+                dist = cloudfront.get_distribution(Id=config.LEGACY_CLOUDFRONT_DISTRIBUTION_ID)
                 dist_config = dist['Distribution']['DistributionConfig']
                 etag = dist['ETag']
-                cloudfront.delete_distribution(Id='E1XNJL0XEWSTK', IfMatch=etag)
-                print("  Deleted legacy CloudFront distribution E1XNJL0XEWSTK")
+                cloudfront.delete_distribution(Id=config.LEGACY_CLOUDFRONT_DISTRIBUTION_ID, IfMatch=etag)
+                print(f"  Deleted legacy CloudFront distribution {config.LEGACY_CLOUDFRONT_DISTRIBUTION_ID}")
                 waiter = cloudfront.get_waiter('distribution_deleted')
-                waiter.wait(Id='E1XNJL0XEWSTK', WaiterConfig={'Delay': 10, 'MaxAttempts': 30})
+                waiter.wait(Id=config.LEGACY_CLOUDFRONT_DISTRIBUTION_ID, WaiterConfig={'Delay': 10, 'MaxAttempts': 30})
                 print("  Legacy CloudFront distribution deleted successfully")
             except ClientError as e2:
                 print(f"  Could not delete legacy distribution: {e2}")
@@ -114,7 +116,7 @@ def delete_legacy_cloudfront_distribution():
 
 def deploy_cloudformation_stack(stack_name, template_file, hosted_zone_id=None):
     """Deploy or update the CloudFormation stack."""
-    cf_client = boto3.client('cloudformation', region_name='us-east-1')
+    cf_client = boto3.client('cloudformation', region_name=config.AWS_REGION)
     
     # Read the template
     with open(template_file, 'r') as f:
@@ -192,13 +194,13 @@ def main():
         sts = boto3.client('sts')
         identity = sts.get_caller_identity()
         print(f"Deploying with AWS Account: {identity['Account']}")
-        print("Using region: us-east-1")
+        print(f"Using region: {config.AWS_REGION}")
     except Exception as e:
         print(f"Error with AWS credentials: {e}")
         sys.exit(1)
     
-    stack_name = "shrimptips-webapp"
-    hosted_zone_id = "Z07886121VL0W5WNRWN26"
+    stack_name = config.STACK_NAME
+    hosted_zone_id = config.HOSTED_ZONE_ID
     
     # Step 1: Delete legacy CloudFront distribution (if it exists)
     # This frees the shrimp.tips CNAME for the new CloudFormation-managed distribution
@@ -235,7 +237,7 @@ def main():
         print("\n✅ Deployment completed successfully!")
         
         # Get CloudFront domain from stack outputs
-        cf_client = boto3.client('cloudformation', region_name='us-east-1')
+        cf_client = boto3.client('cloudformation', region_name=config.AWS_REGION)
         response = cf_client.describe_stacks(StackName=stack_name)
         outputs = response['Stacks'][0].get('Outputs', [])
         

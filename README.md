@@ -18,9 +18,9 @@ ShrimpTips uses a sophisticated multi-stage AI pipeline built on AWS serverless 
 
 ### Prerequisites
 
-1.  **AWS CLI** configured with appropriate credentials and access to the `us-east-1` region.
+1.  **AWS CLI** configured with appropriate credentials and access to your target region.
 2.  **Python 3.12+** installed.
-3.  **AWS Bedrock Model Access**: Ensure you have access to the following models in `us-east-1`:
+3.  **AWS Bedrock Model Access**: Ensure you have access to the following models in your target region:
     - `amazon.nova-pro-v1:0` (for prompt generation)
     - `amazon.nova-canvas-v1:0` (for image generation)
 4.  **Boto3** installed (`pip install boto3`).
@@ -33,33 +33,40 @@ ShrimpTips uses a sophisticated multi-stage AI pipeline built on AWS serverless 
     cd shrimptips
     ```
 
-2.  **Install dependencies:**
+2.  **Configure your deployment:**
+    ```bash
+    cp .env.example .env
+    # Edit .env with your preferred settings (AWS region, domain, etc.)
+    ```
+
+3.  **Install dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
 
-3.  **Deploy the stack:**
-    ```bash
-    python deploy.py
-    ```
+4.  **Deploy the stack:**
+     ```bash
+     python deploy.py
+     ```
 
-4.  **Access your application:**
-    Open `https://shrimp.tips` in your browser to see your ShrimpTips application in action!
+5.  **Access your application:**
+    Open `https://<your-domain>` in your browser to see your ShrimpTips application in action!
     The CloudFront distribution serves the web interface and routes API requests to Lambda via API Gateway.
 
 ### Custom Domain Setup
 
-To use the `shrimp.tips` domain, CloudFormation manages the entire delivery path automatically:
+To use a custom domain, CloudFormation manages the entire delivery path automatically:
 
-1.  Ensure you have a Route 53 hosted zone for `shrimp.tips`.
-2.  Run `python deploy.py` — the deploy script passes the hosted zone ID (`Z07886121VL0W5WNRWN26`) by default.
-3.  The stack creates:
+1.  Ensure you have a Route 53 hosted zone for your domain.
+2.  Set `HOSTED_ZONE_ID` and `DOMAIN_NAME` in your `.env` file.
+3.  Run `python deploy.py` — the deploy script reads these values from `.env` (defaults to `shrimp.tips`).
+4.  The stack creates:
     - **ACM certificate** with DNS validation in your Route 53 hosted zone
-    - **CloudFront distribution** with the ACM certificate and shrimp.tips as an alias
-    - **Route 53 A record** (alias) pointing shrimp.tips to the CloudFront distribution
+    - **CloudFront distribution** with the ACM certificate and your domain as an alias
+    - **Route 53 A record** (alias) pointing your domain to the CloudFront distribution
     - **Origin Access Control (OAC)** for secure API Gateway access
 
-The deploy script automatically removes the legacy CloudFront distribution (E1XNJL0XEWSTK) before deploying the new CloudFormation-managed one, freeing the shrimp.tips CNAME.
+The deploy script automatically removes the legacy CloudFront distribution before deploying the new CloudFormation-managed one, freeing your domain's CNAME.
 
 ## 📁 Project Structure
 
@@ -72,6 +79,8 @@ shrimptips/
 │   └── shrimptips-stack.yaml  # CloudFormation template
 ├── deploy.py                  # Deployment automation script
 ├── check_deployment.py        # Utility to verify Lambda sync
+├── config.py                  # Shared configuration (loads from .env)
+├── .env.example               # Configuration template
 ├── requirements.txt           # Python dependencies
 └── README.md                  # This file
 ```
@@ -85,6 +94,18 @@ shrimptips/
 - **Responsive Design**: Works seamlessly on desktop and mobile devices.
 
 ## 🔧 Configuration
+
+### Environment Variables
+
+Create a `.env` file in the project root (copy from `.env.example`) to configure deployment settings:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AWS_REGION` | `us-east-1` | AWS region for deployment |
+| `STACK_NAME` | `shrimptips-webapp` | CloudFormation stack name |
+| `HOSTED_ZONE_ID` | `Z07886121VL0W5WNRWN26` | Route 53 Hosted Zone ID for custom domain |
+| `DOMAIN_NAME` | `shrimp.tips` | Domain name for the application |
+| `LEGACY_CLOUDFRONT_DISTRIBUTION_ID` | `E1XNJL0XEWSTK` | Legacy CloudFront distribution to clean up |
 
 ### AWS Requirements
 
@@ -105,7 +126,7 @@ To test the Lambda functions locally:
     pip install -r requirements.txt
     ```
 
-2.  Set up AWS credentials with access to Bedrock in `us-east-1`.
+2.  Set up AWS credentials and configure `.env` with your target region.
 
 3.  Run individual functions with test events using a local testing tool or `pytest`.
 
@@ -116,6 +137,8 @@ After deploying, you can verify that your local code is synchronized with the de
 ```bash
 python check_deployment.py
 ```
+
+The script reads your `.env` configuration to connect to the correct region and stack.
 
 ## 📊 Monitoring
 
@@ -152,5 +175,6 @@ This project is licensed under the MIT License.
 
 For issues or questions:
 1. Check the CloudWatch logs for error details.
-2. Verify AWS Bedrock model access in `us-east-1`.
+2. Verify AWS Bedrock model access in your configured region.
 3. Ensure proper IAM permissions for the Lambda execution role.
+4. Review your `.env` configuration for correct settings.

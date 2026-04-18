@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from botocore.exceptions import ClientError
 
+import config
+
 def get_file_sha256(file_path):
     sha256_hash = hashlib.sha256()
     with open(file_path, "rb") as f:
@@ -22,8 +24,8 @@ def create_lambda_package_sha256(source_file):
         return sha256
 
 def check_deployment():
-    region = 'us-east-1'
-    stack_name = "shrimptips-webapp"
+    region = config.AWS_REGION
+    stack_name = config.STACK_NAME
     cf_client = boto3.client('cloudformation', region_name=region)
     lambda_client = boto3.client('lambda', region_name=region)
 
