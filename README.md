@@ -8,11 +8,11 @@ Leveraging advanced AI, the app generates unique, retro-style Occupational Safet
 
 ShrimpTips uses a sophisticated multi-stage AI pipeline built on AWS serverless technologies:
 
-1.  **Web Interface**: A responsive HTML/JavaScript frontend served via **Amazon API Gateway** and **AWS Lambda**.
+1.  **Web Interface**: A responsive HTML/JavaScript frontend served via **Amazon CloudFront** and **Amazon API Gateway** with **AWS Lambda**.
 2.  **AI Prompt Engineering**: When a user requests a poster, the **Poster Generator Lambda** calls **Amazon Bedrock (Amazon Nova Pro)** to generate a highly creative and contextually rich image generation prompt.
 3.  **AI Image Generation**: The generated prompt is then passed to **Amazon Bedrock (Amazon Nova Canvas)** to produce a unique, high-quality, OSHA-style safety poster.
-4.  **Infrastructure as Code (IaC)**: The entire environment is provisioned and managed using **AWS CloudFormation**.
-5.  **Custom Domain & Security**: Optional support for custom domains using **Amazon Route 53** and **AWS Certificate Manager (ACM)**.
+4.  **Infrastructure as Code (IaC)**: The entire environment is provisioned and managed using **AWS CloudFormation**, including CloudFront, ACM, and Route 53.
+5.  **Custom Domain & Security**: **Amazon CloudFront** serves HTTPS traffic via an **ACM**-managed certificate, with **Route 53** alias records routing `shrimp.tips` to the CloudFront distribution.
 
 ## 🚀 Quick Deployment
 
@@ -44,15 +44,22 @@ ShrimpTips uses a sophisticated multi-stage AI pipeline built on AWS serverless 
     ```
 
 4.  **Access your application:**
-    The deployment script will output the **API Gateway URL**. Open this URL in your browser to see your ShrimpTips application in action!
+    Open `https://shrimp.tips` in your browser to see your ShrimpTips application in action!
+    The CloudFront distribution serves the web interface and routes API requests to Lambda via API Gateway.
 
-### Custom Domain Setup (Optional)
+### Custom Domain Setup
 
-To use the `shrimp.tips` domain:
+To use the `shrimp.tips` domain, CloudFormation manages the entire delivery path automatically:
 
 1.  Ensure you have a Route 53 hosted zone for `shrimp.tips`.
-2.  Modify `deploy.py` to pass the `HostedZoneId` to the `deploy_cloudformation_stack` function.
-3.  Redeploy the stack.
+2.  Run `python deploy.py` — the deploy script passes the hosted zone ID (`Z07886121VL0W5WNRWN26`) by default.
+3.  The stack creates:
+    - **ACM certificate** with DNS validation in your Route 53 hosted zone
+    - **CloudFront distribution** with the ACM certificate and shrimp.tips as an alias
+    - **Route 53 A record** (alias) pointing shrimp.tips to the CloudFront distribution
+    - **Origin Access Control (OAC)** for secure API Gateway access
+
+The deploy script automatically removes the legacy CloudFront distribution (E1XNJL0XEWSTK) before deploying the new CloudFormation-managed one, freeing the shrimp.tips CNAME.
 
 ## 📁 Project Structure
 
@@ -120,7 +127,7 @@ The application uses **Amazon CloudWatch** for:
 ## 🔒 Security
 
 - **IAM Least Privilege**: Lambda execution roles are scoped to minimum required permissions.
-- **HTTPS-only**: All traffic is served over HTTPS via API Gateway.
+- **HTTPS-only**: All traffic is served over HTTPS via CloudFront with ACM-managed certificate.
 - **CORS**: Properly configured for secure browser access.
 
 ## 💰 Cost Optimization
