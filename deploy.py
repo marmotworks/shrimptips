@@ -5,6 +5,7 @@ This script packages the Lambda functions and deploys the CloudFormation templat
 """
 import sys
 import os
+import time
 import boto3
 import zipfile
 import tempfile
@@ -38,6 +39,78 @@ def update_lambda_function(function_name, zip_file_path):
     except ClientError as e:
         print(f"Error updating {function_name}: {e}")
         return False
+
+def delete_legacy_cloudfront_distribution():
+    """Delete the legacy CloudFront distribution E1XNJL0XEWSTK.
+    
+    Before deleting, removes the shrimp.tips CNAME alias to free it for
+    the new CloudFormation-managed distribution.
+    """
+    print("\n1. Cleaning up legacy CloudFront distribution...")
+    cloudfront = boto3.client('cloudfront', region_name='us-east-1')
+    
+    try:
+        dist = cloudfront.get_distribution(Id='E1XNJL0XEWSTK')
+        dist_config = dist['Distribution']['DistributionConfig']
+        etag = dist['ETag']
+        
+        # Remove shrimp.tips from aliases to free the CNAME
+        aliases = dist_config.get('Aliases', {}).get('Items', [])
+        original_aliases = list(aliases)
+        
+        if 'shrimp.tips' in aliases:
+            aliases.remove('shrimp.tips')
+            print(f"  Removed shrimp.tips alias from distribution (was: {original_aliases})")
+        else:
+            print(f"  shrimp.tips alias not found in distribution aliases: {aliases}")
+        
+        dist_config['Aliases'] = {'Quantity': len(aliases), 'Items': aliases}
+        
+        # Update the distribution to remove the alias
+        cloudfront.update_distribution(
+            Id='E1XNJL0XEWSTK',
+            DistributionConfig=dist_config,
+            IfMatch=etag
+        )
+        print("  Updated distribution to remove shrimp.tips alias")
+        
+        # Wait a moment for the alias update to propagate
+        time.sleep(5)
+        
+        # Re-fetch the ETag since update_distribution generates a new one
+        dist = cloudfront.get_distribution(Id='E1XNJL0XEWSTK')
+        etag = dist['ETag']
+        
+        # Delete the distribution
+        cloudfront.delete_distribution(Id='E1XNJL0XEWSTK', IfMatch=etag)
+        print("  Deleted legacy CloudFront distribution E1XNJL0XEWSTK")
+        
+        # Wait for deletion to complete (max ~5 minutes)
+        print("  Waiting for distribution deletion to complete...")
+        waiter = cloudfront.get_waiter('distribution_deleted')
+        waiter.wait(Id='E1XNJL0XEWSTK', WaiterConfig={'Delay': 10, 'MaxAttempts': 30})
+        print("  Legacy CloudFront distribution deleted successfully")
+        
+    except ClientError as e:
+        error_code = e.response['Error']['Code'] if 'Error' in e.response else ''
+        if error_code == 'NoSuchDistribution':
+            print("  Legacy CloudFront distribution already deleted")
+        elif error_code == 'PreconditionFailed':
+            print(f"  Precondition error (etag mismatch): {e}")
+            print("  Attempting to re-fetch and delete...")
+            try:
+                dist = cloudfront.get_distribution(Id='E1XNJL0XEWSTK')
+                dist_config = dist['Distribution']['DistributionConfig']
+                etag = dist['ETag']
+                cloudfront.delete_distribution(Id='E1XNJL0XEWSTK', IfMatch=etag)
+                print("  Deleted legacy CloudFront distribution E1XNJL0XEWSTK")
+                waiter = cloudfront.get_waiter('distribution_deleted')
+                waiter.wait(Id='E1XNJL0XEWSTK', WaiterConfig={'Delay': 10, 'MaxAttempts': 30})
+                print("  Legacy CloudFront distribution deleted successfully")
+            except ClientError as e2:
+                print(f"  Could not delete legacy distribution: {e2}")
+        else:
+            print(f"  Error accessing legacy distribution: {e}")
 
 def deploy_cloudformation_stack(stack_name, template_file, hosted_zone_id=None):
     """Deploy or update the CloudFormation stack."""
@@ -125,24 +198,28 @@ def main():
         sys.exit(1)
     
     stack_name = "shrimptips-webapp"
+    hosted_zone_id = "Z07886121VL0W5WNRWN26"
     
-    # Deploy CloudFormation stack first
-    print("\n1. Deploying CloudFormation stack...")
+    # Step 1: Delete legacy CloudFront distribution (if it exists)
+    # This frees the shrimp.tips CNAME for the new CloudFormation-managed distribution
+    delete_legacy_cloudfront_distribution()
+    
+    # Step 2: Deploy CloudFormation stack
+    print("\n2. Deploying CloudFormation stack...")
     template_file = Path("templates/shrimptips-stack.yaml")
     
     if not template_file.exists():
         print(f"Error: Template file {template_file} not found!")
         sys.exit(1)
     
-    # For now, deploy without custom domain (hosted zone ID can be added later)
-    success = deploy_cloudformation_stack(stack_name, str(template_file))
+    success = deploy_cloudformation_stack(stack_name, str(template_file), hosted_zone_id)
     
     if not success:
         print("CloudFormation deployment failed!")
         sys.exit(1)
     
-    # Update Lambda functions with actual code
-    print("\n2. Updating Lambda functions with code...")
+    # Step 3: Update Lambda functions with actual code
+    print("\n3. Updating Lambda functions with code...")
     
     # Package and update poster generator function
     poster_zip = create_lambda_package("poster_generator", "lambdas/poster_generator.py")
@@ -156,17 +233,24 @@ def main():
     
     if success1 and success2:
         print("\n✅ Deployment completed successfully!")
-        print("\nYour ShrimpTips webapp is now live!")
         
-        # Get the API Gateway URL
+        # Get CloudFront domain from stack outputs
         cf_client = boto3.client('cloudformation', region_name='us-east-1')
         response = cf_client.describe_stacks(StackName=stack_name)
         outputs = response['Stacks'][0].get('Outputs', [])
         
+        cloudfront_domain = None
         for output in outputs:
-            if output['OutputKey'] == 'ApiGatewayUrl':
-                print(f"\n🌐 Access your webapp at: {output['OutputValue']}")
+            if output['OutputKey'] == 'CloudFrontDomain':
+                cloudfront_domain = output['OutputValue']
                 break
+        
+        if cloudfront_domain and cloudfront_domain != 'Not configured - no HostedZoneId provided':
+            print(f"\n🌐 Access your webapp at: https://shrimp.tips")
+            print(f"   CloudFront domain: {cloudfront_domain}")
+        else:
+            print(f"\n🌐 Access your webapp at: https://shrimp.tips")
+            print("   Note: CloudFront not configured - provide HostedZoneId for custom domain support")
     else:
         print("\n❌ Lambda function updates failed!")
         sys.exit(1)
