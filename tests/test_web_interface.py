@@ -7,14 +7,19 @@ def test_lambda_handler_root():
     assert 'text/html' in response['headers']['Content-Type']
     assert '🦐 ShrimpTips' in response['body']
 
-def test_lambda_handler_api_poster_404():
-    event = {'path': '/api/poster'}
-    response = lambda_handler(event, None)
-    assert response['statusCode'] == 404
-    assert 'Poster API endpoint not found' in response['body']
-
 def test_lambda_handler_default_path():
     event = {} # path missing
     response = lambda_handler(event, None)
     assert response['statusCode'] == 200
     assert '🦐 ShrimpTips' in response['body']
+
+def test_lambda_handler_contains_poster_elements():
+    event = {'path': '/'}
+    response = lambda_handler(event, None)
+    assert response['statusCode'] == 200
+    body = response['body']
+    assert 'poster-content' in body
+    assert 'poster-image' in body
+    assert 'safety-tip' in body
+    assert 'generate-btn' in body
+    assert 'api/poster' in body

@@ -17,10 +17,7 @@ logger.setLevel(logging.INFO)
 CONFIG = {
     "NOVA_PRO_MAX_TOKENS": 1000,
     "NOVA_PRO_TEMPERATURE": 0.8,
-    "NOVA_PRO_TOP_P": 0.9,
-    "NOVA_CANVAS_MAX_PROMPT_LENGTH": 1024,
-    "NOVA_CANVAS_CFG_SCALE": 7.0,
-    "NOVA_CANVAS_QUALITY": "premium"
+    "NOVA_PRO_TOP_P": 0.9
 }
 
 # Initialize Bedrock client
@@ -68,28 +65,26 @@ SHRIMP_SCENARIOS = [
     "shrimp hiding in seaweed"
 ]
 
-AI_PROMPT = """You are a creative director for the Ocean Floor Safety Inspectors Union, tasked with creating OSHA-style safety posters for wild shrimp. 
+AI_PROMPT = """You are a creative director for the Ocean Floor Safety Inspectors Union, tasked with creating OSHA-style safety posters for wild shrimp.
 
 Generate a unique and creative safety poster concept that includes:
-1. A specific safety tip or warning for wild shrimp (be creative but realistic to ocean dangers)
+1. A specific safety tip or warning for wild shrimp
 2. A visual scenario description featuring shrimp in their ocean environment
-3. Specific visual style elements that would work for a vintage OSHA poster
+3. Specific visual style elements for a vintage OSHA poster
 
-Your response should be a detailed image generation prompt that includes:
-- The safety message/slogan (make it short, catchy, and memorable)
-- Instructions for the text: The slogan MUST be written in bold, clean, legible sans-serif typography, centered and prominently displayed. The text should be high-contrast and coherent.
-- The visual scene (specific ocean environment, shrimp behavior, potential hazards)
-- Visual style (vintage OSHA poster aesthetic with maritime elements, distressed paper texture, high quality)
-- Color scheme (traditional safety colors: hazard yellow, signal red, deep black)
-- Safety symbols and iconography (e.g., warning triangles, exclamation marks)
-
-Be creative and vary the scenarios - think about different ocean zones (coral reefs, deep sea, kelp forests, open ocean), different types of hazards (predators, pollution, fishing equipment, currents, temperature changes), and different shrimp behaviors (schooling, feeding, hiding, migrating).
+Your response should be a single, concise image generation prompt (under 800 characters) that includes:
+- The safety message/slogan (short, catchy, and memorable)
+- Instructions for the text: The slogan MUST be written in bold, clean, legible sans-serif typography, centered and prominently displayed.
+- The visual scene (environment, shrimp behavior, hazards)
+- Visual style (vintage OSHA aesthetic, maritime elements, distressed paper)
+- Color scheme (hazard yellow, signal red, deep black)
+- Safety symbols and iconography
 
 Format your response as a single detailed image generation prompt, and end with the safety slogan in quotes."""
 
 def generate_creative_prompt_with_ai():
     """Use Bedrock Nova Pro to generate a creative and varied poster prompt."""
-    
+
     try:
         # Call Nova Pro to generate the creative prompt
         request_body = json.dumps({
@@ -105,21 +100,21 @@ def generate_creative_prompt_with_ai():
                 "topP": CONFIG["NOVA_PRO_TOP_P"]
             }
         })
-        
+
         response = bedrock.invoke_model(
             body=request_body,
             modelId='amazon.nova-pro-v1:0',
             accept='application/json',
             contentType='application/json'
         )
-        
+
         response_json = json.loads(response.get("body").read())
         generated_content = response_json['output']['message']['content'][0]['text']
-        
+
         # Extract the safety slogan from the end of the response
         lines = generated_content.strip().split('\n')
         safety_tip = "Stay Safe in the Deep Blue!"  # Default fallback
-        
+
         # Look for quoted text at the end which should be our safety slogan
         for line in reversed(lines):
             if '"' in line:
@@ -128,9 +123,9 @@ def generate_creative_prompt_with_ai():
                 if quotes:
                     safety_tip = quotes[-1]
                     break
-        
+
         return generated_content.strip(), safety_tip
-        
+
     except Exception as e:
         # Fallback to original method if AI generation fails
         logger.warning(f"AI prompt generation failed, falling back to original method: {str(e)}")
@@ -141,7 +136,7 @@ def generate_fallback_prompt():
     tip = random.choice(SAFETY_TIPS)
     style = random.choice(POSTER_STYLES)
     scenario = random.choice(SHRIMP_SCENARIOS)
-    
+
     # Add some additional creative elements
     additional_elements = [
         "with dramatic lighting and shadows",
@@ -151,18 +146,18 @@ def generate_fallback_prompt():
         "with a distressed paper background effect",
         "featuring classic OSHA color combinations"
     ]
-    
+
     extra_element = random.choice(additional_elements)
-    
-    prompt = f"""Create a {style} featuring {scenario} {extra_element}. 
+
+    prompt = f"""Create a {style} featuring {scenario} {extra_element}.
     The poster should have the safety message "{tip}" prominently displayed in bold, readable text.
     Include OSHA-style warning symbols and safety iconography.
     Use a color scheme typical of vintage safety posters (yellows, reds, blacks).
-    The overall design should be professional yet slightly whimsical, 
+    The overall design should be professional yet slightly whimsical,
     as if created by a union of ocean-floor safety inspectors.
     Include maritime safety elements and ocean-themed warning symbols.
     Make it look like an official workplace safety poster but for marine life."""
-    
+
     return prompt, tip
 
 def lambda_handler(event, context):
@@ -171,34 +166,22 @@ def lambda_handler(event, context):
     """
     try:
         logger.info("Starting poster generation")
-        
+
         # Generate the poster prompt using AI
         prompt, safety_tip = generate_creative_prompt_with_ai()
         logger.info(f"Generated AI prompt for tip: {safety_tip}")
         logger.info(f"Full prompt: {prompt[:200]}...")  # Log first 200 chars for debugging
-        
-        # Prepare the request body for Nova Canvas
-        # Truncate prompt to the maximum allowed length defined in CONFIG
-        truncated_prompt = prompt[:CONFIG["NOVA_CANVAS_MAX_PROMPT_LENGTH"] - 1]
-        
+
+        # Prepare the request body for Amazon Nova Canvas
         api_request = json.dumps({
             "taskType": "TEXT_IMAGE",
             "textToImageParams": {
-                "text": truncated_prompt,
-                "negativeText": "blurry, low quality, distorted text, unreadable, modern digital style, misspelled words"
-            },
-            "imageGenerationConfig": {
-                "numberOfImages": 1,
-                "height": 1024,
-                "width": 768,  # Portrait orientation for poster
-                "seed": random.randint(1, 1000000),
-                "cfgScale": CONFIG["NOVA_CANVAS_CFG_SCALE"],
-                "quality": CONFIG["NOVA_CANVAS_QUALITY"]
+                "text": prompt[:1000]
             }
         })
-        
-        logger.info("Calling Bedrock Nova Canvas")
-        
+
+        logger.info("Calling Bedrock Amazon Nova Canvas")
+
         # Call Nova Canvas to generate the image
         for attempt in range(3):
             try:
@@ -213,20 +196,21 @@ def lambda_handler(event, context):
                 if attempt == 2:
                     raise e
                 logger.warning(f"Attempt {attempt + 1} failed to generate image: {str(e)}. Retrying...")
-        
+
         logger.info("Received response from Bedrock")
-        
+
         # Parse the response
         response_json = json.loads(response.get("body").read())
-        images = response_json.get("images")
-        
-        if not images or len(images) == 0:
+        if "images" not in response_json or not response_json["images"]:
             raise ValueError("Bedrock returned no images in the response")
-            
-        base64_image = images[0]
-        
+
+        if isinstance(response_json["images"][0], dict):
+            base64_image = response_json["images"][0]["data"]
+        else:
+            base64_image = response_json["images"][0]
+
         logger.info("Successfully generated poster image")
-        
+
         # Return the image as base64 with metadata
         return {
             'statusCode': 200,
@@ -242,12 +226,12 @@ def lambda_handler(event, context):
                 'prompt_used': prompt
             })
         }
-        
+
     except Exception as e:
         logger.error(f"Error generating poster: {str(e)}")
         logger.error(f"Error type: {type(e).__name__}")
         logger.error(f"Traceback: {traceback.format_exc()}")
-        
+
         return {
             'statusCode': 500,
             'headers': {

@@ -9,11 +9,11 @@ def test_lambda_handler_success(mock_bedrock):
     mock_pro_response.get("body").read.return_value = b'{"output": {"message": {"content": [{"text": "A vintage poster of a shrimp. \\"Stay Safe!\\""}]}}}'
     
     # Mock Nova Canvas response for image generation
-    mock_canvas_response = MagicMock()
-    mock_canvas_response.get.return_value = MagicMock()
-    mock_canvas_response.get("body").read.return_value = b'{"images": ["base64_image_data"]}'
-    
-    mock_bedrock.invoke_model.side_effect = [mock_pro_response, mock_canvas_response]
+    mock_nova_response = MagicMock()
+    mock_nova_response.get.return_value = MagicMock()
+    mock_nova_response.get("body").read.return_value = b'{"images": [{"format": "png", "data": "base64_image_data"}]}'
+
+    mock_bedrock.invoke_model.side_effect = [mock_pro_response, mock_nova_response]
     
     response = lambda_handler({}, None)
     

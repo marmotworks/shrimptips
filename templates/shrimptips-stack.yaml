@@ -6,7 +6,7 @@ Parameters:
     Type: String
     Default: 'shrimp.tips'
     Description: 'Domain name for the application'
-  
+
   HostedZoneId:
     Type: String
     Description: 'Route 53 Hosted Zone ID for the domain'
@@ -35,11 +35,43 @@ Resources:
               - Effect: Allow
                 Action:
                   - bedrock:InvokeModel
-                Resource: 
+                Resource:
                   - 'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-canvas-v1:0'
                   - 'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-pro-v1:0'
                   - 'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0'
                   - 'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0'
+
+  # Log Groups for Lambda functions (to minimize cost)
+  PosterGeneratorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-poster-generator'
+      RetentionInDays: 7
+
+  WebInterfaceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-web-interface'
+      RetentionInDays: 7
+
+  # API Gateway Logging configuration
+  ApiGatewayLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayLoggingRole.Arn
 
   # Lambda function for poster generation
   PosterGeneratorFunction:
@@ -165,7 +197,7 @@ Resources:
       FunctionName: !Ref PosterGeneratorFunction
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ShrimpTipsApi}/*/GET/api/poster'
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ShrimpTipsApi}/*/*/*'
 
   WebInterfaceLambdaPermission:
     Type: AWS::Lambda::Permission
@@ -173,10 +205,10 @@ Resources:
       FunctionName: !Ref WebInterfaceFunction
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ShrimpTipsApi}/*/GET/'
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ShrimpTipsApi}/*/*/*'
 
   # API Gateway Deployment
-  ApiDeployment:
+  ApiDeploymentV2:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - PosterGetMethod
@@ -184,7 +216,20 @@ Resources:
       - RootGetMethod
     Properties:
       RestApiId: !Ref ShrimpTipsApi
+
+  # API Gateway Stage
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref ShrimpTipsApi
+      DeploymentId: !Ref ApiDeploymentV2
       StageName: 'prod'
+      MethodSettings:
+        - HttpMethod: '*'
+          ResourcePath: '/*'
+          LoggingLevel: INFO
+          DataTraceEnabled: true
+          MetricsEnabled: true
 
   # Custom domain name (conditional)
   CustomDomainName:
@@ -212,7 +257,7 @@ Resources:
   BasePathMapping:
     Type: AWS::ApiGateway::BasePathMapping
     Condition: HasHostedZone
-    DependsOn: ApiDeployment
+    DependsOn: ApiStage
     Properties:
       DomainName: !Ref CustomDomainName
       RestApiId: !Ref ShrimpTipsApi

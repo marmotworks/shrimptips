@@ -1,7 +1,8 @@
 import pytest
+import os
 from playwright.sync_api import Page, expect
 
-BASE_URL = "https://shrimp.tips"
+BASE_URL = os.environ.get("BASE_URL", "https://shrimp.tips/").rstrip("/") + "/"
 
 def test_homepage_loads(page: Page):
     page.goto(BASE_URL)
@@ -23,9 +24,6 @@ def test_generate_button_works(page: Page):
     page.goto(BASE_URL)
     # Wait for initial poster
     expect(page.locator(".poster-image")).to_be_visible(timeout=15000)
-    
-    # Capture current tip to compare
-    initial_tip = page.locator(".safety-tip").inner_text()
     
     # Click generate button
     btn = page.locator("#generate-btn")

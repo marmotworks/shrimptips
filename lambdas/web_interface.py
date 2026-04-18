@@ -10,13 +10,7 @@ def lambda_handler(event, context):
     # Check if this is a request for the poster API
     path = event.get('path', '/')
     
-    if path == '/api/poster':
-        # This should be handled by the poster_generator function
-        return {
-            'statusCode': 404,
-            'body': 'Poster API endpoint not found'
-        }
-    
+    # Serve the main HTML page    
     # Serve the main HTML page
     html_content = """
 <!DOCTYPE html>
@@ -164,7 +158,7 @@ def lambda_handler(event, context):
             content.innerHTML = '<div class="loading">🌊 Generating your personalized shrimp safety poster...<br><small>This may take a few moments</small></div>';
             
             try {
-                const response = await fetch('/api/poster', {
+                const response = await fetch('api/poster', {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json'
